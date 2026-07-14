@@ -399,6 +399,83 @@
     .priority-badge.medium { background: #FEF3C7; color: var(--amber-600); }
     .priority-badge.low    { background: #DBEAFE; color: var(--blue-600); }
 
+    /* ===== 分类标签 ===== */
+    .category-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+    .category-badge.work     { background: #E0E7FF; color: #4338CA; }
+    .category-badge.personal { background: #FCE7F3; color: #BE185D; }
+    .category-badge.study    { background: #D1FAE5; color: #047857; }
+    .category-badge.life     { background: #FEF3C7; color: #B45309; }
+    .category-badge.other    { background: #F3F4F6; color: #4B5563; }
+
+    /* ===== 搜索框 ===== */
+    .search-wrapper {
+      position: relative;
+    }
+    .search-wrapper input {
+      width: 100%;
+      height: 44px;
+      padding: 0 16px 0 40px;
+      font-size: 14px;
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      background: var(--white);
+      color: var(--gray-800);
+      outline: none;
+      transition: all var(--transition);
+    }
+    .search-wrapper input::placeholder { color: var(--gray-400); }
+    .search-wrapper input:focus {
+      border-color: var(--blue-400);
+      box-shadow: 0 0 0 4px rgba(74,144,217,0.08);
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray-400);
+      pointer-events: none;
+    }
+    .search-icon svg { width: 18px; height: 18px; display: block; }
+
+    /* 无搜索结果 */
+    .no-result {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--gray-400);
+      font-size: 14px;
+    }
+
+    /* ===== 导出按钮 ===== */
+    .btn-export {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--blue-600);
+      background: var(--blue-50);
+      border: 1.5px dashed var(--blue-300);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .btn-export:hover {
+      background: var(--blue-100);
+      border-color: var(--blue-400);
+    }
+    .btn-export svg { width: 16px; height: 16px; }
+
     /* ===== 编辑按钮 ===== */
     .btn-edit {
       width: 32px;
@@ -603,6 +680,13 @@
           <option value="high">🔥 高</option>
           <option value="low">🌱 低</option>
         </select>
+        <select class="priority-select" id="categorySelect" style="min-width:72px;">
+          <option value="work">💼 工作</option>
+          <option value="personal">👤 个人</option>
+          <option value="study">📚 学习</option>
+          <option value="life">🏠 生活</option>
+          <option value="other">📌 其他</option>
+        </select>
         <button class="btn-add" id="btnAdd">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -634,6 +718,26 @@
     <div class="actions-row">
       <button class="btn-clear" id="btnClear" style="display:none;">🗑️ 清空已完成</button>
       <button class="btn-clear danger" id="btnClearAll">⚠️ 全部清空</button>
+      <button class="btn-export" id="btnExport">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        导出任务
+      </button>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="card" style="padding:16px 20px;">
+      <div class="search-wrapper">
+        <span class="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </span>
+        <input type="text" id="searchInput" placeholder="搜索任务..." autocomplete="off">
+      </div>
     </div>
 
     <!-- 任务列表 -->
@@ -643,26 +747,51 @@
   </div>
 
   <script>
+    // ============================================================
+    // 整个代码用 IIFE（立即执行函数）包裹，避免污染全局作用域
+    // ============================================================
     (function() {
+      // -------------------- 1. 常量 & DOM 元素获取 --------------------
+      // STORAGE_KEY: localStorage 中存储任务数据的键名
       const STORAGE_KEY = 'todo-app-tasks';
-      const taskInput    = document.getElementById('taskInput');
-      const btnAdd       = document.getElementById('btnAdd');
-      const taskList     = document.getElementById('taskList');
-      const pendingCount = document.getElementById('pendingCount');
-      const doneCount    = document.getElementById('doneCount');
-      const btnClear     = document.getElementById('btnClear');
-      const btnClearAll  = document.getElementById('btnClearAll');
-      const prioritySelect = document.getElementById('prioritySelect');
 
-      let tasks = [];
-      let editingId = null; // 当前正在编辑的任务 ID
+      // 通过 id 获取页面上的各个 DOM 元素，后续用于绑定事件或更新内容
+      const taskInput     = document.getElementById('taskInput');      // 输入框：输入新任务文字
+      const btnAdd        = document.getElementById('btnAdd');         // 按钮：点击添加新任务
+      const taskList      = document.getElementById('taskList');       // 容器：任务列表渲染到这里
+      const pendingCount  = document.getElementById('pendingCount');   // 数字：未完成任务数量
+      const doneCount     = document.getElementById('doneCount');      // 数字：已完成任务数量
+      const btnClear      = document.getElementById('btnClear');       // 按钮：清空所有"已完成"的任务
+      const btnClearAll   = document.getElementById('btnClearAll');    // 按钮：一键清空全部任务
+      const btnExport     = document.getElementById('btnExport');      // 按钮：导出任务为文本文件
+      const searchInput   = document.getElementById('searchInput');    // 输入框：搜索关键词
+      const prioritySelect  = document.getElementById('prioritySelect');  // 下拉框：选择优先级（高/中/低）
+      const categorySelect  = document.getElementById('categorySelect');  // 下拉框：选择分类（工作/个人/学习等）
 
+      // -------------------- 2. 全局状态变量 --------------------
+      let tasks = [];            // 任务列表数组，每个元素是一个任务对象 {id, text, completed, priority, category}
+      let editingId = null;     // 当前正在编辑的任务的 id，null 表示没有任务处于编辑状态
+      let searchQuery = '';     // 当前搜索框中的关键词，用于过滤任务列表
+
+      // 优先级英文到中文显示的映射表
       const PRIORITY_LABELS = { high: '高', medium: '中', low: '低' };
+      // 分类英文到中文显示的映射表
+      const CATEGORY_LABELS = { work: '工作', personal: '个人', study: '学习', life: '生活', other: '其他' };
 
-      /* ===== 确认弹窗 ===== */
+
+      // ==================== 3. 确认弹窗 ====================
+      /**
+       * 显示一个模态确认弹窗，用于危险操作前的二次确认（如清空任务）
+       * @param {string} title     - 弹窗标题
+       * @param {string} desc      - 弹窗描述文字
+       * @param {Function} onConfirm - 用户点击"确认"按钮后的回调函数
+       */
       function showConfirm(title, desc, onConfirm) {
+        // 1. 创建遮罩层（半透明背景覆盖全页面）
         const overlay = document.createElement('div');
         overlay.className = 'overlay';
+
+        // 2. 在遮罩层内插入弹窗的 HTML 结构
         overlay.innerHTML = `
           <div class="dialog">
             <div class="dialog-icon">⚠️</div>
@@ -673,138 +802,291 @@
               <button class="btn-confirm">确认清空</button>
             </div>
           </div>`;
+
+        // 3. 把遮罩层添加到 <body> 中，弹窗就显示出来了
         document.body.appendChild(overlay);
 
+        // 4. 绑定"取消"按钮：点击后移除遮罩层（关闭弹窗）
         overlay.querySelector('.btn-dismiss').addEventListener('click', () => overlay.remove());
+
+        // 5. 绑定"确认"按钮：先移除遮罩层，再执行用户传入的回调函数
         overlay.querySelector('.btn-confirm').addEventListener('click', () => {
           overlay.remove();
-          onConfirm();
+          onConfirm();  // 执行真正的操作（如清空任务）
         });
+
+        // 6. 点击遮罩层背景区域也能关闭弹窗（用户体验优化）
         overlay.addEventListener('click', function(e) {
+          // e.target 是实际被点击的元素，只有点击遮罩本身（不是弹窗内部）才关闭
           if (e.target === overlay) overlay.remove();
         });
       }
 
-      /* ===== 数据持久化 ===== */
+
+      // ==================== 4. 数据持久化（localStorage）====================
+      /**
+       * 从 localStorage 加载任务数据
+       * 自动兼容旧版本数据：给没有 priority/category 字段的旧任务补上默认值
+       */
       function loadTasks() {
         try {
+          // 从 localStorage 读取 JSON 字符串
           const raw = localStorage.getItem(STORAGE_KEY);
+          // 如果有数据就解析为数组，没有就初始化为空数组
           tasks = raw ? JSON.parse(raw) : [];
-          // 兼容旧数据（没有 priority 字段）
-          tasks.forEach(t => { if (!t.priority) t.priority = 'medium'; });
-        } catch { tasks = []; }
+
+          // 遍历所有任务，给缺少字段的旧数据补充默认值
+          tasks.forEach(t => {
+            if (!t.priority) t.priority = 'medium';  // 旧数据没有优先级 → 默认"中"
+            if (!t.category) t.category = 'work';     // 旧数据没有分类 → 默认"工作"
+          });
+        } catch {
+          // JSON 解析失败时（数据损坏等异常），重置为空数组
+          tasks = [];
+        }
       }
 
+      /**
+       * 把当前任务数组保存到 localStorage
+       */
       function saveTasks() {
+        // JSON.stringify 把数组转成 JSON 字符串后存入
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       }
 
-      /* ===== 生成唯一 ID ===== */
+
+      // ==================== 5. 工具函数 ====================
+      /**
+       * 生成一个全局唯一的任务 ID
+       * 原理：当前时间戳（转 36 进制） + 随机字符串
+       * 例如: "m5f8k3x2" + "a1b2c3"
+       */
       function genId() {
+        // Date.now() 转 36 进制（压缩长度），拼接随机字符串的前 6 位
         return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       }
 
-      /* ===== 添加任务 ===== */
-      function addTask(text) {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        tasks.unshift({
-          id: genId(),
-          text: trimmed,
-          completed: false,
-          priority: prioritySelect.value
-        });
-        saveTasks();
-        render();
-        taskInput.value = '';
-        taskInput.focus();
+      /**
+       * 防止 XSS 攻击：把用户输入中的 HTML 特殊字符转义
+       * 例如 "<script>" → "&lt;script&gt;"
+       * 原理：利用浏览器的 textContent → innerHTML 自动转义特性
+       */
+      function escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;     // textContent 不会解析 HTML
+        return div.innerHTML;      // 返回转义后的安全字符串
       }
 
-      /* ===== 切换完成状态 ===== */
+
+      // ==================== 6. 任务增删改查核心操作 ====================
+
+      // --- 添加任务 ---
+      /**
+       * 创建一个新任务并添加到列表最前面
+       * @param {string} text - 用户输入的任务文字
+       */
+      function addTask(text) {
+        const trimmed = text.trim();          // 去除首尾空格
+        if (!trimmed) return;                  // 空内容不添加
+
+        // unshift：把新任务插入到数组最前面（最新的显示在最上面）
+        tasks.unshift({
+          id: genId(),                        // 唯一 ID
+          text: trimmed,                      // 任务文字
+          completed: false,                   // 初始状态：未完成
+          priority: prioritySelect.value,     // 用户选择的优先级
+          category: categorySelect.value      // 用户选择的分类
+        });
+
+        saveTasks();      // 保存到 localStorage
+        render();         // 重新渲染页面（显示新任务）
+        taskInput.value = '';  // 清空输入框
+        taskInput.focus();     // 输入框重新获得焦点（方便连续添加）
+      }
+
+      // --- 切换任务的完成/未完成状态 ---
+      /**
+       * 点击复选框时，切换任务的 completed 状态
+       * @param {string} id - 要切换的任务 ID
+       */
       function toggleTask(id) {
-        if (editingId) return;
+        if (editingId) return;  // 正在编辑中时不响应点击
+
+        // find：在数组中查找匹配 id 的任务对象
         const task = tasks.find(t => t.id === id);
         if (task) {
-          task.completed = !task.completed;
+          task.completed = !task.completed;  // 取反：完成→未完成，未完成→完成
           saveTasks();
           render();
         }
       }
 
-      /* ===== 删除任务 ===== */
+      // --- 删除单个任务 ---
+      /**
+       * 从任务列表中移除指定 id 的任务
+       * @param {string} id - 要删除的任务 ID
+       */
       function deleteTask(id) {
-        if (editingId) return;
+        if (editingId) return;  // 正在编辑中时不响应
+
+        // filter：创建一个新数组，把 id 不匹配的那个任务过滤掉
         tasks = tasks.filter(t => t.id !== id);
         saveTasks();
         render();
       }
 
-      /* ===== 进入编辑模式 ===== */
-      function startEdit(id) {
-        editingId = id;
-        render();
-        const item = document.querySelector(`[data-id="${id}"]`);
-        if (item) {
-          const input = item.querySelector('.edit-input');
-          if (input) {
-            input.focus();
-            input.setSelectionRange(input.value.length, input.value.length);
-          }
-        }
-      }
-
-      /* ===== 保存编辑 ===== */
-      function saveEdit(id, text) {
-        const trimmed = text.trim();
-        if (!trimmed) {
-          cancelEdit();
-          return;
-        }
-        const task = tasks.find(t => t.id === id);
-        if (task) {
-          task.text = trimmed;
-          saveTasks();
-        }
-        editingId = null;
-        render();
-      }
-
-      /* ===== 取消编辑 ===== */
-      function cancelEdit() {
-        editingId = null;
-        render();
-      }
-
-      /* ===== 清空已完成 ===== */
+      // --- 清空所有已完成任务 ---
       function clearCompleted() {
+        // 只保留 completed 为 false（未完成）的任务
         tasks = tasks.filter(t => !t.completed);
         saveTasks();
         render();
       }
 
-      /* ===== 全部清空 ===== */
+      // --- 一键清空所有任务（带确认弹窗）---
       function clearAll() {
+        // 弹出确认对话框，用户点"确认"后才执行清空
         showConfirm(
           '确认全部清空？',
           '此操作将删除所有任务（包括已完成和未完成），不可恢复。',
           function() {
-            tasks = [];
+            tasks = [];   // 直接赋值为空数组
             saveTasks();
             render();
           }
         );
       }
 
-      /* ===== 更新统计 ===== */
-      function updateStats() {
-        const pending = tasks.filter(t => !t.completed).length;
-        const done    = tasks.filter(t => t.completed).length;
-        pendingCount.textContent = pending;
-        doneCount.textContent    = done;
-        btnClear.style.display   = done > 0 ? 'block' : 'none';
+
+      // ==================== 7. 内联编辑功能 ====================
+
+      // --- 进入编辑模式 ---
+      /**
+       * 将指定任务切换为编辑模式（显示输入框替代文字）
+       * @param {string} id - 要编辑的任务 ID
+       */
+      function startEdit(id) {
+        editingId = id;   // 记录当前编辑中的任务 id
+        render();         // 重新渲染（render 会检测 editingId，给该任务渲染输入框）
+
+        // 渲染完成后，找到刚生成的编辑输入框，自动聚焦并把光标移到末尾
+        const item = document.querySelector(`[data-id="${id}"]`);
+        if (item) {
+          const input = item.querySelector('.edit-input');
+          if (input) {
+            input.focus();                                                    // 输入框获得焦点
+            input.setSelectionRange(input.value.length, input.value.length);  // 光标定位到文字末尾
+          }
+        }
       }
 
-      /* ===== 空状态 ===== */
+      // --- 保存编辑 ---
+      /**
+       * 保存编辑后的任务文字
+       * @param {string} id   - 任务 ID
+       * @param {string} text - 编辑后的新文字
+       */
+      function saveEdit(id, text) {
+        const trimmed = text.trim();
+        if (!trimmed) {
+          // 如果编辑后文字为空，直接取消编辑
+          cancelEdit();
+          return;
+        }
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+          task.text = trimmed;  // 更新任务文字
+          saveTasks();
+        }
+        editingId = null;  // 退出编辑状态
+        render();
+      }
+
+      // --- 取消编辑 ---
+      function cancelEdit() {
+        editingId = null;  // 清除编辑状态
+        render();          // 重新渲染，恢复普通显示
+      }
+
+
+      // ==================== 8. 导出功能 ====================
+      /**
+       * 把所有任务导出为一个 .txt 文本文件并触发浏览器下载
+       * 原理：把文字拼成字符串 → 创建 Blob 对象 → 生成临时下载链接 → 自动点击下载
+       */
+      function exportTasks() {
+        if (tasks.length === 0) return;  // 没有任务时不导出
+
+        // 1. 生成导出时间戳，格式如 "2026-07-14 15:30"
+        const now = new Date();
+        const timestamp = now.getFullYear() + '-'
+          + String(now.getMonth() + 1).padStart(2, '0') + '-'  // padStart(2,'0')：不足两位补 0，如 7 → "07"
+          + String(now.getDate()).padStart(2, '0') + ' '
+          + String(now.getHours()).padStart(2, '0') + ':'
+          + String(now.getMinutes()).padStart(2, '0');
+
+        // 2. 逐行构建文件内容
+        const lines = [];
+        lines.push('📋 待办事项导出 — ' + timestamp);   // 标题行
+        lines.push('='.repeat(40));                     // 分隔线
+        lines.push('');
+
+        // 3. 遍历每个任务，拼出每一行
+        tasks.forEach((t, i) => {
+          const status   = t.completed ? '[✅]' : '[　]';                      // 完成状态
+          const priority = '[' + PRIORITY_LABELS[t.priority] + ']';            // 优先级
+          const category = '[' + (CATEGORY_LABELS[t.category] || '其他') + ']'; // 分类
+          lines.push((i + 1) + '. ' + status + ' ' + priority + ' ' + category + ' ' + t.text);
+        });
+
+        lines.push('');
+        lines.push('='.repeat(40));
+        const pending = tasks.filter(t => !t.completed).length;
+        const done    = tasks.filter(t => t.completed).length;
+        lines.push('总计: ' + tasks.length + ' 项 | 未完成: ' + pending + ' | 已完成: ' + done);
+
+        // 4. 把所有行用换行符连接成一个完整字符串
+        const text = lines.join('\n');
+
+        // 5. 创建 Blob（二进制大对象），\uFEFF 是 BOM 标记，确保 Windows 记事本能正确识别 UTF-8
+        const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+
+        // 6. 创建一个隐藏的临时下载链接
+        const url = URL.createObjectURL(blob);   // 为 Blob 生成一个临时 URL
+        const a = document.createElement('a');    // 创建 <a> 标签
+        a.href = url;                             // 设置链接地址为 Blob URL
+        a.download = 'todo-export-' + timestamp.replace(/[:\s]/g, '-') + '.txt';  // 下载文件名
+
+        // 7. 模拟点击触发下载，然后清理
+        document.body.appendChild(a);  // 必须把 <a> 加入 DOM 才能触发点击
+        a.click();                      // 模拟点击，浏览器开始下载
+        document.body.removeChild(a);   // 下载后移除临时元素
+        URL.revokeObjectURL(url);       // 释放 Blob URL 占用的内存
+      }
+
+
+      // ==================== 9. 页面渲染 ====================
+
+      /**
+       * 更新统计栏的数字：未完成数量和已完成数量
+       * 同时控制"清空已完成"按钮的显隐（没有已完成任务时隐藏）
+       */
+      function updateStats() {
+        // filter 过滤出未完成/已完成的任务，取 length 得到数量
+        const pending = tasks.filter(t => !t.completed).length;
+        const done    = tasks.filter(t => t.completed).length;
+
+        // 更新页面上的数字
+        pendingCount.textContent = pending;
+        doneCount.textContent    = done;
+
+        // 有已完成任务时才显示"清空已完成"按钮
+        btnClear.style.display = done > 0 ? 'block' : 'none';
+      }
+
+      /**
+       * 空状态提示的 HTML（当没有任何任务时显示）
+       */
       function emptyStateHTML() {
         return `
           <div class="empty-state">
@@ -820,8 +1102,16 @@
           </div>`;
       }
 
-      /* ===== 渲染任务卡片 ===== */
+      /**
+       * 生成单个任务卡片的 HTML 字符串
+       * 有两种模式：
+       *   1. 普通模式：显示文字+优先级徽章+分类徽章+编辑/删除按钮
+       *   2. 编辑模式（task.id === editingId）：显示输入框+保存/取消按钮
+       * @param {Object} task - 任务对象
+       * @returns {string} HTML 字符串
+       */
       function taskItemHTML(task) {
+        // --- 编辑模式：显示输入框和保存/取消按钮 ---
         if (editingId === task.id) {
           return `
             <div class="task-item editing" data-id="${task.id}">
@@ -830,21 +1120,30 @@
               <button class="btn-cancel">取消</button>
             </div>`;
         }
+
+        // --- 普通模式：显示复选框、徽章、文字、操作按钮 ---
         return `
           <div class="task-item${task.completed ? ' completed' : ''}" data-id="${task.id}">
+            <!-- 自定义勾选框：点击切换完成状态 -->
             <div class="checkbox${task.completed ? ' checked' : ''}">
               <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
+            <!-- 优先级徽章 -->
             <span class="priority-badge ${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
+            <!-- 分类徽章 -->
+            <span class="category-badge ${task.category || 'other'}">${CATEGORY_LABELS[task.category] || CATEGORY_LABELS['other']}</span>
+            <!-- 任务文字 -->
             <span class="task-text">${escapeHTML(task.text)}</span>
+            <!-- 编辑按钮 -->
             <button class="btn-edit" title="编辑">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </button>
+            <!-- 删除按钮 -->
             <button class="btn-delete" title="删除">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -854,70 +1153,107 @@
           </div>`;
       }
 
-      /* ===== 渲染 ===== */
+      /**
+       * 主渲染函数：根据当前数据重新绘制整个任务列表
+       * 这是整个应用的核心——每次数据变化后都要调用此函数更新画面
+       */
       function render() {
-        if (tasks.length === 0) {
-          taskList.innerHTML = emptyStateHTML();
-        } else {
-          taskList.innerHTML = tasks.map(taskItemHTML).join('');
+        // === 第一步：根据搜索关键词过滤任务 ===
+        let filteredTasks = tasks;
+        if (searchQuery.trim()) {
+          // 把搜索词和任务文字都转小写，实现"忽略大小写"的模糊匹配
+          const q = searchQuery.trim().toLowerCase();
+          filteredTasks = tasks.filter(t => t.text.toLowerCase().includes(q));
+          // includes() 检查任务文字中是否包含搜索词
         }
+
+        // === 第二步：根据过滤结果渲染不同内容 ===
+        if (tasks.length === 0) {
+          // 情况 A：完全没有任务 → 显示空状态引导页
+          taskList.innerHTML = emptyStateHTML();
+        } else if (filteredTasks.length === 0) {
+          // 情况 B：有任务但全被搜索过滤掉了 → 显示"无匹配结果"提示
+          taskList.innerHTML = '<div class="no-result">🔍 没有找到匹配的任务</div>';
+        } else {
+          // 情况 C：有匹配的任务 → 逐个生成 HTML 并拼接到一起
+          // map(taskItemHTML) 把每个任务对象转成 HTML 字符串
+          // join('') 把所有 HTML 片段拼成一个完整字符串
+          taskList.innerHTML = filteredTasks.map(taskItemHTML).join('');
+        }
+
+        // === 第三步：更新统计数字 ===
         updateStats();
       }
 
-      function escapeHTML(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      }
 
-      /* ===== 事件委托 ===== */
+      // ==================== 10. 事件绑定 ====================
+
+      // --- 事件委托：用一个监听器处理所有任务卡片的点击 ---
+      // 优点：不需要给每个按钮单独绑定事件，性能更好，新增的任务也能自动响应
       taskList.addEventListener('click', function(e) {
+        // 找到被点击元素所属的 .task-item 容器
         const item = e.target.closest('.task-item');
-        if (!item) return;
-        const id = item.dataset.id;
+        if (!item) return;  // 点击的不是任务区域，忽略
+
+        const id = item.dataset.id;  // 从 data-id 属性获取任务 ID
         if (!id) return;
 
+        // 根据被点击的具体元素，判断用户想做什么操作
         if (e.target.closest('.btn-delete')) {
-          deleteTask(id);
+          deleteTask(id);              // 点击了删除按钮
         } else if (e.target.closest('.checkbox')) {
-          toggleTask(id);
+          toggleTask(id);              // 点击了复选框（切换完成状态）
         } else if (e.target.closest('.btn-edit')) {
-          startEdit(id);
+          startEdit(id);               // 点击了编辑按钮
         } else if (e.target.closest('.btn-save')) {
+          // 点击了保存按钮 → 获取输入框的值并保存
           const editInput = document.getElementById('editInput-' + id);
           saveEdit(id, editInput ? editInput.value : '');
         } else if (e.target.closest('.btn-cancel')) {
-          cancelEdit();
+          cancelEdit();                // 点击了取消按钮
         }
       });
 
-      // 编辑模式下按回车保存
+      // --- 编辑模式的键盘操作 ---
       taskList.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && editingId) {
+          // 编辑模式下按回车 → 保存编辑
           const editInput = document.getElementById('editInput-' + editingId);
           if (editInput) saveEdit(editingId, editInput.value);
         } else if (e.key === 'Escape' && editingId) {
+          // 编辑模式下按 Esc → 取消编辑
           cancelEdit();
         }
       });
 
-      /* ===== 输入事件 ===== */
+      // --- 添加任务：点击"添加任务"按钮 ---
       btnAdd.addEventListener('click', function() {
         addTask(taskInput.value);
       });
 
+      // --- 添加任务：在输入框中按回车键 ---
       taskInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') addTask(taskInput.value);
       });
 
-      /* ===== 清空事件 ===== */
-      btnClear.addEventListener('click', clearCompleted);
-      btnClearAll.addEventListener('click', clearAll);
+      // --- 搜索：输入时实时过滤任务列表（每输入一个字符就重新渲染）---
+      searchInput.addEventListener('input', function() {
+        searchQuery = searchInput.value;  // 更新搜索关键词
+        render();                         // 重新渲染（render 内部会根据 searchQuery 过滤）
+      });
 
-      /* ===== 启动 ===== */
-      loadTasks();
-      render();
-      taskInput.focus();
+      // --- 清空按钮 ---
+      btnClear.addEventListener('click', clearCompleted);    // "清空已完成"按钮
+      btnClearAll.addEventListener('click', clearAll);       // "全部清空"按钮
+
+      // --- 导出按钮 ---
+      btnExport.addEventListener('click', exportTasks);      // "导出任务"按钮
+
+
+      // ==================== 11. 启动应用 ====================
+      loadTasks();       // 从 localStorage 加载之前保存的任务数据
+      render();          // 首次渲染页面
+      taskInput.focus(); // 输入框自动获得焦点，方便用户直接输入
     })();
   </script>
 </body>
